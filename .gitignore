@@ -1,0 +1,24 @@
+.vs/
+
+# build result
+*.pdb
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+
+# build intermediate
+*.tlog
+*.log
+*.idb
+*.recipe
+*.obj
+*.vcxproj.FileListAbsolute.txt
+*.lastbuildstate
+*.ilk
+*.iobj
+*.ipdb
+
+# debug settings
+*.user
+
