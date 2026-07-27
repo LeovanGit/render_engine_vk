@@ -89,7 +89,37 @@ void RenderEngine::InitVulkan()
 
 void RenderEngine::InitSwapchain()
 {
+    CreateSwapchain(m_swapchainSize.width, m_swapchainSize.height);
+}
 
+void RenderEngine::CreateSwapchain(uint32_t width, uint32_t height)
+{
+    vkb::SwapchainBuilder swapchainBuilder{ m_chosenGPU, m_device, m_surface };
+
+    m_swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
+
+    vkb::Swapchain vkbSwapchain = swapchainBuilder
+        .set_desired_format(VkSurfaceFormatKHR{ m_swapchainImageFormat, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })
+        .set_desired_present_mode(VK_PRESENT_MODE_FIFO_KHR)
+        .set_desired_extent(width, height)
+        .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+        .build()
+        .value();
+
+    m_swapchainSize = vkbSwapchain.extent;
+    m_swapchain = vkbSwapchain.swapchain;
+    m_swapchainImages = vkbSwapchain.get_images().value();
+    m_swapchainImageViews = vkbSwapchain.get_image_views().value();
+}
+
+void RenderEngine::DestroySwapchain()
+{
+    vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
+
+    for (int i = 0; i != m_swapchainImageViews.size(); i++)
+    {
+        vkDestroyImageView(m_device, m_swapchainImageViews[i], nullptr);
+    }
 }
 
 void RenderEngine::InitCommands()
@@ -105,6 +135,14 @@ void RenderEngine::InitSyncStructures()
 void RenderEngine::Destroy()
 {
     assert(m_instance != nullptr && "Engine is not initialized");
+
+    m_instance->DestroySwapchain();
+
+    vkDestroySurfaceKHR(m_instance->m_vkInstance, m_instance->m_surface, nullptr);
+    vkDestroyDevice(m_instance->m_device, nullptr);
+
+    vkb::destroy_debug_utils_messenger(m_instance->m_vkInstance, m_instance->m_debugMessenger);
+    vkDestroyInstance(m_instance->m_vkInstance, nullptr);
 
     SDL_DestroyWindow(m_instance->m_window);
 

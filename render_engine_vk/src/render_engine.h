@@ -33,8 +33,14 @@ public:
 
 	VkPhysicalDevice m_chosenGPU;
 	VkDevice m_device;
-	
 
+	VkSwapchainKHR m_swapchain;
+	VkFormat m_swapchainImageFormat;
+
+	std::vector<VkImage> m_swapchainImages;
+	std::vector<VkImageView> m_swapchainImageViews;
+	VkExtent2D m_swapchainSize;
+	
 private:
 	RenderEngine() = default;
 	~RenderEngine() = default;
@@ -48,6 +54,8 @@ private:
 	void InitVulkan();
 
 	void InitSwapchain();
+	void CreateSwapchain(uint32_t width, uint32_t height);
+	void DestroySwapchain();
 
 	void InitCommands();
 
