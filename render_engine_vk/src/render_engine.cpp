@@ -1,6 +1,7 @@
 #include "render_engine.h"
 
 #include <SDL.h>
+#include <SDL_vulkan.h>
 
 #include <assert.h>
 
@@ -28,6 +29,77 @@ void RenderEngine::Init()
         windowSize.width,
         windowSize.height,
         SDL_WINDOW_VULKAN);
+
+    m_instance->InitVulkan();
+
+    m_instance->InitSwapchain();
+
+    m_instance->InitCommands();
+
+    m_instance->InitSyncStructures();
+}
+
+void RenderEngine::InitVulkan()
+{
+    // vkInstance
+    vkb::InstanceBuilder builder;
+
+    auto instanceRet = builder
+        .set_app_name("Example Vulkan Application")
+        .request_validation_layers(bUseValidationLayers)
+        .use_default_debug_messenger()
+        .require_api_version(1, 3, 0)
+        .build();
+
+    vkb::Instance vkbInstance = instanceRet.value();
+
+    m_vkInstance = vkbInstance.instance;
+    m_debugMessenger = vkbInstance.debug_messenger;
+
+    // VkSurfaceKHR
+    SDL_Vulkan_CreateSurface(m_window, m_vkInstance, &m_surface);
+
+    // vulkan 1.3 features
+    VkPhysicalDeviceVulkan13Features features13 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
+    features13.dynamicRendering = true;
+    features13.synchronization2 = true;
+
+    // vulkan 1.2 features
+    VkPhysicalDeviceVulkan12Features features12 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+    features12.bufferDeviceAddress = true;
+    features12.descriptorIndexing = true;
+
+    // select GPU
+    vkb::PhysicalDeviceSelector selector{ vkbInstance };
+    vkb::PhysicalDevice physicalDevice = selector
+        .set_minimum_version(1, 3)
+        .set_required_features_13(features13)
+        .set_required_features_12(features12)
+        .set_surface(m_surface)
+        .select()
+        .value();
+
+    // VkPhysicalDevice and VkDevice
+    vkb::DeviceBuilder deviceBuilder{ physicalDevice };
+    vkb::Device vkbDevice = deviceBuilder.build().value();
+
+    m_device = vkbDevice.device;
+    m_chosenGPU = physicalDevice.physical_device;
+}
+
+void RenderEngine::InitSwapchain()
+{
+
+}
+
+void RenderEngine::InitCommands()
+{
+
+}
+
+void RenderEngine::InitSyncStructures()
+{
+
 }
 
 void RenderEngine::Destroy()

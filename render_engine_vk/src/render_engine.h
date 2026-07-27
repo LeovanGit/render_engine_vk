@@ -26,6 +26,15 @@ public:
 
 	struct SDL_Window* m_window = nullptr;
 
+	VkInstance m_vkInstance;
+	VkDebugUtilsMessengerEXT m_debugMessenger;
+
+	VkSurfaceKHR m_surface;
+
+	VkPhysicalDevice m_chosenGPU;
+	VkDevice m_device;
+	
+
 private:
 	RenderEngine() = default;
 	~RenderEngine() = default;
@@ -35,6 +44,14 @@ private:
 
 	void operator=(RenderEngine& other) = delete;
 	void operator=(RenderEngine&& other) = delete;
+
+	void InitVulkan();
+
+	void InitSwapchain();
+
+	void InitCommands();
+
+	void InitSyncStructures();
 
 	static RenderEngine* m_instance;
 };
