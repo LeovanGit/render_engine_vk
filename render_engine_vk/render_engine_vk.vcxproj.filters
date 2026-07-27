@@ -21,6 +21,9 @@
     <ClCompile Include="src\render_engine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="external_libs\vk-bootstrap\VkBootstrap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\render_engine.h">
@@ -29,5 +32,19 @@
     <ClInclude Include="src\types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="external_libs\vk-bootstrap\VkBootstrap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="external_libs\vk-bootstrap\VkBootstrapDispatch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.inl">
+      <Filter>Header Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

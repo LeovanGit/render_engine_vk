@@ -4,6 +4,8 @@
 
 #include <assert.h>
 
+#include <VkBootstrap.h>
+
 RenderEngine* RenderEngine::m_instance = nullptr;
 
 RenderEngine& RenderEngine::Get()
