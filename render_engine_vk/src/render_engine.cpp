@@ -7,6 +7,8 @@
 
 #include <VkBootstrap.h>
 
+#include "vk_init_helpers.h"
+
 RenderEngine* RenderEngine::m_instance = nullptr;
 
 RenderEngine& RenderEngine::Get()
@@ -85,6 +87,10 @@ void RenderEngine::InitVulkan()
 
     m_device = vkbDevice.device;
     m_chosenGPU = physicalDevice.physical_device;
+
+    // Request VkQueue and QueueFamily index for QueueType::graphics (which support all commands):
+    m_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+    m_graphicsQueueFamilyIndex = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 }
 
 void RenderEngine::InitSwapchain()
@@ -124,6 +130,16 @@ void RenderEngine::DestroySwapchain()
 
 void RenderEngine::InitCommands()
 {
+    VkCommandPoolCreateInfo m_commandPoolInfo = vk_init_helpers::CommandPoolCreateInfo(m_graphicsQueueFamilyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+    for (int i = 0; i != FRAMEDATA_COUNT; i++)
+    {
+        VK_CHECK(vkCreateCommandPool(m_device, &m_commandPoolInfo, nullptr, &m_frames[i].m_commandPool));
+
+        VkCommandBufferAllocateInfo cmdAllocInfo = vk_init_helpers::CommandBufferAllocateInfo(m_frames[i].m_commandPool, 1);
+
+        VK_CHECK(vkAllocateCommandBuffers(m_device, &cmdAllocInfo, &m_frames[i].m_commandBuffer));
+    }
 
 }
 
@@ -135,6 +151,13 @@ void RenderEngine::InitSyncStructures()
 void RenderEngine::Destroy()
 {
     assert(m_instance != nullptr && "Engine is not initialized");
+
+    vkDeviceWaitIdle(m_instance->m_device);
+
+    for (int i = 0; i != FRAMEDATA_COUNT; ++i)
+    {
+        vkDestroyCommandPool(m_instance->m_device, m_instance->m_frames[i].m_commandPool, nullptr);
+    }
 
     m_instance->DestroySwapchain();
 

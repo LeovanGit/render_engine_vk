@@ -8,7 +8,15 @@ namespace
 	constexpr VkOffset2D windowPos = { 1000, 200 };
 
 	constexpr bool bUseValidationLayers = true;
+
+	constexpr unsigned int FRAMEDATA_COUNT = 2;
 } // namespace
+
+struct FrameData
+{
+	VkCommandPool m_commandPool;
+	VkCommandBuffer m_commandBuffer;
+};
 
 // Singletone
 class RenderEngine
@@ -40,6 +48,13 @@ public:
 	std::vector<VkImage> m_swapchainImages;
 	std::vector<VkImageView> m_swapchainImageViews;
 	VkExtent2D m_swapchainSize;
+
+	uint32_t m_currentFrameNumber = 0;
+
+	FrameData m_frames[FRAMEDATA_COUNT];
+
+	VkQueue m_graphicsQueue;
+	uint32_t m_graphicsQueueFamilyIndex;
 	
 private:
 	RenderEngine() = default;

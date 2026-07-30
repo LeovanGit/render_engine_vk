@@ -22,6 +22,7 @@
     <ClCompile Include="external_libs\vk-bootstrap\VkBootstrap.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\render_engine.cpp" />
+    <ClCompile Include="src\vk_init_helpers.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="external_libs\vk-bootstrap\VkBootstrap.h" />
@@ -29,6 +30,7 @@
     <ClInclude Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.h" />
     <ClInclude Include="src\render_engine.h" />
     <ClInclude Include="src\types.h" />
+    <ClInclude Include="src\vk_init_helpers.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.inl" />
@@ -115,7 +117,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;FMT_HEADER_ONLY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)external_libs\SDL2-2.30.0\include;$(VULKAN_SDK)\Include;$(ProjectDir)external_libs\fmt-12.2.0\include;$(ProjectDir)external_libs\vk-bootstrap;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
