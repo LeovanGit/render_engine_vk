@@ -16,6 +16,10 @@ struct FrameData
 {
 	VkCommandPool m_commandPool;
 	VkCommandBuffer m_commandBuffer;
+
+	VkFence m_renderFence;
+	VkSemaphore m_swapchainSemaphore;
+	VkSemaphore m_renderSemaphore;
 };
 
 // Singletone
@@ -31,6 +35,11 @@ public:
 	void Run(); // main loop
 
 	void Draw();
+
+	FrameData& GetCurrentFrame()
+	{
+		return m_frames[m_currentFrameNumber % FRAMEDATA_COUNT];
+	}
 
 	struct SDL_Window* m_window = nullptr;
 

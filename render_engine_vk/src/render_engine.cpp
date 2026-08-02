@@ -1,4 +1,4 @@
-#include "render_engine.h"
+﻿#include "render_engine.h"
 
 #include <SDL.h>
 #include <SDL_vulkan.h>
@@ -7,7 +7,7 @@
 
 #include <VkBootstrap.h>
 
-#include "vk_init_helpers.h"
+#include "vk_helpers.h"
 
 RenderEngine* RenderEngine::m_instance = nullptr;
 
@@ -130,13 +130,13 @@ void RenderEngine::DestroySwapchain()
 
 void RenderEngine::InitCommands()
 {
-    VkCommandPoolCreateInfo m_commandPoolInfo = vk_init_helpers::CommandPoolCreateInfo(m_graphicsQueueFamilyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandPoolCreateInfo m_commandPoolInfo = vk_helpers::CommandPoolCreateInfo(m_graphicsQueueFamilyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     for (int i = 0; i != FRAMEDATA_COUNT; i++)
     {
         VK_CHECK(vkCreateCommandPool(m_device, &m_commandPoolInfo, nullptr, &m_frames[i].m_commandPool));
 
-        VkCommandBufferAllocateInfo cmdAllocInfo = vk_init_helpers::CommandBufferAllocateInfo(m_frames[i].m_commandPool, 1);
+        VkCommandBufferAllocateInfo cmdAllocInfo = vk_helpers::CommandBufferAllocateInfo(m_frames[i].m_commandPool, 1);
 
         VK_CHECK(vkAllocateCommandBuffers(m_device, &cmdAllocInfo, &m_frames[i].m_commandBuffer));
     }
@@ -145,7 +145,24 @@ void RenderEngine::InitCommands()
 
 void RenderEngine::InitSyncStructures()
 {
-
+    VkFenceCreateInfo fenceCreateInfo = {};
+    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceCreateInfo.pNext = nullptr;
+    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    
+    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semaphoreCreateInfo.pNext = nullptr;
+    semaphoreCreateInfo.flags = 0;
+    
+    for (int i = 0; i != FRAMEDATA_COUNT; ++i)
+    {
+        VK_CHECK(vkCreateFence(m_device, &fenceCreateInfo, nullptr, &m_frames[i].m_renderFence));
+    
+        VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_frames[i].m_swapchainSemaphore));
+    
+        VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_frames[i].m_renderSemaphore));
+    }
 }
 
 void RenderEngine::Destroy()
@@ -157,6 +174,10 @@ void RenderEngine::Destroy()
     for (int i = 0; i != FRAMEDATA_COUNT; ++i)
     {
         vkDestroyCommandPool(m_instance->m_device, m_instance->m_frames[i].m_commandPool, nullptr);
+
+        vkDestroySemaphore(m_instance->m_device, m_instance->m_frames[i].m_renderSemaphore, nullptr);
+        vkDestroySemaphore(m_instance->m_device, m_instance->m_frames[i].m_swapchainSemaphore, nullptr);
+        vkDestroyFence(m_instance->m_device, m_instance->m_frames[i].m_renderFence, nullptr);
     }
 
     m_instance->DestroySwapchain();
@@ -196,5 +217,55 @@ void RenderEngine::Run()
 
 void RenderEngine::Draw()
 {
+    VK_CHECK(vkWaitForFences(m_device, 1, &GetCurrentFrame().m_renderFence, true, 1000000000));
+    VK_CHECK(vkResetFences(m_device, 1, &GetCurrentFrame().m_renderFence));
 
+    uint32_t swapchainImageIndex;
+    VK_CHECK(vkAcquireNextImageKHR(m_device, m_swapchain, 1000000000, GetCurrentFrame().m_swapchainSemaphore, nullptr, &swapchainImageIndex));
+
+    VkCommandBuffer cmd = GetCurrentFrame().m_commandBuffer;
+    VK_CHECK(vkResetCommandBuffer(cmd, 0));
+
+    VkCommandBufferBeginInfo cmdBeginInfo = {};
+    cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBeginInfo.pNext = nullptr;
+    cmdBeginInfo.pInheritanceInfo = nullptr;
+    cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+
+    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+    VkClearColorValue clearValue;
+    float flash = std::abs(std::sin(m_currentFrameNumber / 120.f));
+    clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
+
+    VkImageSubresourceRange clearRange = vk_helpers::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+
+    vkCmdClearColorImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+
+    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+    VK_CHECK(vkEndCommandBuffer(cmd));
+
+    VkCommandBufferSubmitInfo cmdinfo = vk_helpers::CommandBufferSubmitInfo(cmd);
+    VkSemaphoreSubmitInfo waitInfo = vk_helpers::SemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, GetCurrentFrame().m_swapchainSemaphore);
+    VkSemaphoreSubmitInfo signalInfo = vk_helpers::SemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, GetCurrentFrame().m_renderSemaphore);
+
+    VkSubmitInfo2 submitInfo = vk_helpers::SubmitInfo(&cmdinfo, &signalInfo, &waitInfo);
+
+    VK_CHECK(vkQueueSubmit2(m_graphicsQueue, 1, &submitInfo, GetCurrentFrame().m_renderFence));
+
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.pNext = nullptr;
+    presentInfo.pSwapchains = &m_swapchain;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pWaitSemaphores = &GetCurrentFrame().m_renderSemaphore;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pImageIndices = &swapchainImageIndex;
+
+    VK_CHECK(vkQueuePresentKHR(m_graphicsQueue, &presentInfo));
+
+    ++m_currentFrameNumber;
 }

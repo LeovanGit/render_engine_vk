@@ -24,7 +24,7 @@
     <ClCompile Include="external_libs\vk-bootstrap\VkBootstrap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\vk_init_helpers.cpp">
+    <ClCompile Include="src\vk_helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -44,7 +44,7 @@
     <ClInclude Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\vk_init_helpers.h">
+    <ClInclude Include="src\vk_helpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
