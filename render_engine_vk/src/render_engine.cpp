@@ -6,6 +6,8 @@
 #include <assert.h>
 
 #include <VkBootstrap.h>
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
 
 #include "vk_helpers.h"
 
@@ -99,11 +101,55 @@ void RenderEngine::InitVulkan()
     // Request VkQueue and QueueFamily index for QueueType::graphics (which support all commands):
     m_graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
     m_graphicsQueueFamilyIndex = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+    // Create VMA memory allocator
+    VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.physicalDevice = m_chosenGPU;
+    allocatorInfo.device = m_device;
+    allocatorInfo.instance = m_vkInstance;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+    vmaCreateAllocator(&allocatorInfo, &m_allocator);
+
+    m_mainDeletionQueue.PushFunction([&](){ vmaDestroyAllocator(m_allocator); });
 }
 
 void RenderEngine::InitSwapchain()
 {
     CreateSwapchain(m_swapchainSize.width, m_swapchainSize.height);
+
+    // Create Render Target texture (VkImage):
+    VkExtent3D drawImageExtent =
+    {
+        windowSize.width,
+        windowSize.height,
+        1
+    };
+
+    m_renderTarget.m_imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+    m_renderTarget.m_imageExtent = drawImageExtent;
+
+    VkImageUsageFlags drawImageUsages{};
+    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+    drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageCreateInfo imgCreateInfo = vk_helpers::ImageCreateInfo(m_renderTarget.m_imageFormat, drawImageUsages, drawImageExtent);
+
+    VmaAllocationCreateInfo imgAllocInfo = {};
+    imgAllocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    imgAllocInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    vmaCreateImage(m_allocator, &imgCreateInfo, &imgAllocInfo, &m_renderTarget.m_image, &m_renderTarget.m_allocation, nullptr);
+
+    VkImageViewCreateInfo imageViewInfo = vk_helpers::ImageViewCreateInfo(m_renderTarget.m_imageFormat, m_renderTarget.m_image, VK_IMAGE_ASPECT_COLOR_BIT);
+    VK_CHECK(vkCreateImageView(m_device, &imageViewInfo, nullptr, &m_renderTarget.m_imageView));
+
+    m_mainDeletionQueue.PushFunction([=]() {
+        vkDestroyImageView(m_device, m_renderTarget.m_imageView, nullptr);
+        vmaDestroyImage(m_allocator, m_renderTarget.m_image, m_renderTarget.m_allocation);
+     });
 }
 
 void RenderEngine::CreateSwapchain(uint32_t width, uint32_t height)
@@ -211,6 +257,17 @@ void RenderEngine::Run()
     }
 }
 
+void RenderEngine::DrawBackground(VkCommandBuffer cmd)
+{
+    VkClearColorValue clearValue;
+    float flash = std::abs(std::sin(m_currentFrameNumber / 120.f));
+    clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
+
+    VkImageSubresourceRange clearRange = vk_helpers::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+
+    vkCmdClearColorImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+}
+
 void RenderEngine::Draw()
 {
     VK_CHECK(vkWaitForFences(m_device, 1, &GetCurrentFrame().m_renderFence, true, 1000000000));
@@ -233,17 +290,19 @@ void RenderEngine::Draw()
 
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
-    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    vk_helpers::TransitionImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
-    VkClearColorValue clearValue;
-    float flash = std::abs(std::sin(m_currentFrameNumber / 120.f));
-    clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
+    DrawBackground(cmd);
 
-    VkImageSubresourceRange clearRange = vk_helpers::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+    vk_helpers::TransitionImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    vkCmdClearColorImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+    VkExtent2D renderTargetSize = {};
+    renderTargetSize.width = m_renderTarget.m_imageExtent.width;
+    renderTargetSize.height = m_renderTarget.m_imageExtent.height;
+    vk_helpers::CopyImageToImage(cmd, m_renderTarget.m_image, m_swapchainImages[swapchainImageIndex], renderTargetSize, m_swapchainSize);
 
-    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VK_CHECK(vkEndCommandBuffer(cmd));
 

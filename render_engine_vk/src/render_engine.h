@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "image.h"
 
 namespace
 {
@@ -56,6 +57,7 @@ public:
 
 	void Run(); // main loop
 
+	void DrawBackground(VkCommandBuffer cmd);
 	void Draw();
 
 	FrameData& GetCurrentFrame()
@@ -88,6 +90,10 @@ public:
 
 	VkQueue m_graphicsQueue;
 	uint32_t m_graphicsQueueFamilyIndex;
+
+	VmaAllocator m_allocator;
+
+	AllocatedImage m_renderTarget;
 	
 private:
 	RenderEngine() = default;

@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="external_libs\vk-bootstrap\VkBootstrap.cpp" />
+    <ClCompile Include="src\image.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\render_engine.cpp" />
     <ClCompile Include="src\vk_helpers.cpp" />
@@ -28,6 +29,7 @@
     <ClInclude Include="external_libs\vk-bootstrap\VkBootstrap.h" />
     <ClInclude Include="external_libs\vk-bootstrap\VkBootstrapDispatch.h" />
     <ClInclude Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.h" />
+    <ClInclude Include="src\image.h" />
     <ClInclude Include="src\render_engine.h" />
     <ClInclude Include="src\types.h" />
     <ClInclude Include="src\vk_helpers.h" />
