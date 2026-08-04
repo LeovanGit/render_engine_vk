@@ -32,6 +32,8 @@ void RenderEngine::Init()
         windowSize.height,
         SDL_WINDOW_VULKAN);
 
+    m_instance->m_mainDeletionQueue.PushFunction([&]() { SDL_DestroyWindow(m_instance->m_window); });
+
     m_instance->InitVulkan();
 
     m_instance->InitSwapchain();
@@ -56,10 +58,14 @@ void RenderEngine::InitVulkan()
     vkb::Instance vkbInstance = instanceRet.value();
 
     m_vkInstance = vkbInstance.instance;
-    m_debugMessenger = vkbInstance.debug_messenger;
+    m_mainDeletionQueue.PushFunction([&]() { vkDestroyInstance(m_vkInstance, nullptr); });
 
+    m_debugMessenger = vkbInstance.debug_messenger;
+    m_mainDeletionQueue.PushFunction([&]() { vkb::destroy_debug_utils_messenger(m_vkInstance, m_debugMessenger); });
+    
     // VkSurfaceKHR
     SDL_Vulkan_CreateSurface(m_window, m_vkInstance, &m_surface);
+    m_mainDeletionQueue.PushFunction([&]() { vkDestroySurfaceKHR(m_vkInstance, m_surface, nullptr); });
 
     // vulkan 1.3 features
     VkPhysicalDeviceVulkan13Features features13 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
@@ -86,6 +92,8 @@ void RenderEngine::InitVulkan()
     vkb::Device vkbDevice = deviceBuilder.build().value();
 
     m_device = vkbDevice.device;
+    m_mainDeletionQueue.PushFunction([&]() { vkDestroyDevice(m_device, nullptr); });
+
     m_chosenGPU = physicalDevice.physical_device;
 
     // Request VkQueue and QueueFamily index for QueueType::graphics (which support all commands):
@@ -116,6 +124,8 @@ void RenderEngine::CreateSwapchain(uint32_t width, uint32_t height)
     m_swapchain = vkbSwapchain.swapchain;
     m_swapchainImages = vkbSwapchain.get_images().value();
     m_swapchainImageViews = vkbSwapchain.get_image_views().value();
+
+    m_mainDeletionQueue.PushFunction([&]() { DestroySwapchain(); });
 }
 
 void RenderEngine::DestroySwapchain()
@@ -135,9 +145,9 @@ void RenderEngine::InitCommands()
     for (int i = 0; i != FRAMEDATA_COUNT; i++)
     {
         VK_CHECK(vkCreateCommandPool(m_device, &m_commandPoolInfo, nullptr, &m_frames[i].m_commandPool));
+        m_mainDeletionQueue.PushFunction([&, commandPool=m_frames[i].m_commandPool]() { vkDestroyCommandPool(m_device, commandPool, nullptr); });
 
         VkCommandBufferAllocateInfo cmdAllocInfo = vk_helpers::CommandBufferAllocateInfo(m_frames[i].m_commandPool, 1);
-
         VK_CHECK(vkAllocateCommandBuffers(m_device, &cmdAllocInfo, &m_frames[i].m_commandBuffer));
     }
 
@@ -158,10 +168,13 @@ void RenderEngine::InitSyncStructures()
     for (int i = 0; i != FRAMEDATA_COUNT; ++i)
     {
         VK_CHECK(vkCreateFence(m_device, &fenceCreateInfo, nullptr, &m_frames[i].m_renderFence));
+        m_mainDeletionQueue.PushFunction([&, renderFence=m_frames[i].m_renderFence]() { vkDestroyFence(m_device, renderFence, nullptr); });
     
         VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_frames[i].m_swapchainSemaphore));
+        m_mainDeletionQueue.PushFunction([&, swapchainSemaphore=m_frames[i].m_swapchainSemaphore]() { vkDestroySemaphore(m_device, swapchainSemaphore, nullptr); });
     
         VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_frames[i].m_renderSemaphore));
+        m_mainDeletionQueue.PushFunction([&, renderSemaphore=m_frames[i].m_renderSemaphore]() { vkDestroySemaphore(m_device, renderSemaphore, nullptr); });
     }
 }
 
@@ -171,24 +184,7 @@ void RenderEngine::Destroy()
 
     vkDeviceWaitIdle(m_instance->m_device);
 
-    for (int i = 0; i != FRAMEDATA_COUNT; ++i)
-    {
-        vkDestroyCommandPool(m_instance->m_device, m_instance->m_frames[i].m_commandPool, nullptr);
-
-        vkDestroySemaphore(m_instance->m_device, m_instance->m_frames[i].m_renderSemaphore, nullptr);
-        vkDestroySemaphore(m_instance->m_device, m_instance->m_frames[i].m_swapchainSemaphore, nullptr);
-        vkDestroyFence(m_instance->m_device, m_instance->m_frames[i].m_renderFence, nullptr);
-    }
-
-    m_instance->DestroySwapchain();
-
-    vkDestroySurfaceKHR(m_instance->m_vkInstance, m_instance->m_surface, nullptr);
-    vkDestroyDevice(m_instance->m_device, nullptr);
-
-    vkb::destroy_debug_utils_messenger(m_instance->m_vkInstance, m_instance->m_debugMessenger);
-    vkDestroyInstance(m_instance->m_vkInstance, nullptr);
-
-    SDL_DestroyWindow(m_instance->m_window);
+    m_instance->m_mainDeletionQueue.Flush();
 
     delete m_instance;
     m_instance = nullptr;
@@ -218,6 +214,9 @@ void RenderEngine::Run()
 void RenderEngine::Draw()
 {
     VK_CHECK(vkWaitForFences(m_device, 1, &GetCurrentFrame().m_renderFence, true, 1000000000));
+
+    GetCurrentFrame().m_deletionQueue.Flush();
+
     VK_CHECK(vkResetFences(m_device, 1, &GetCurrentFrame().m_renderFence));
 
     uint32_t swapchainImageIndex;

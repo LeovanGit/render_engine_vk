@@ -12,6 +12,26 @@ namespace
 	constexpr unsigned int FRAMEDATA_COUNT = 2;
 } // namespace
 
+struct DeletionQueue
+{
+	std::deque<std::function<void()>> deletors;
+
+	void PushFunction(std::function<void()>&& function)
+	{
+		deletors.push_back(function);
+	}
+
+	void Flush()
+	{
+		for (auto it = deletors.rbegin(); it != deletors.rend(); ++it)
+		{
+			(*it)();
+		}
+
+		deletors.clear();
+	}
+};
+
 struct FrameData
 {
 	VkCommandPool m_commandPool;
@@ -20,6 +40,8 @@ struct FrameData
 	VkFence m_renderFence;
 	VkSemaphore m_swapchainSemaphore;
 	VkSemaphore m_renderSemaphore;
+
+	DeletionQueue m_deletionQueue;
 };
 
 // Singletone
@@ -40,6 +62,8 @@ public:
 	{
 		return m_frames[m_currentFrameNumber % FRAMEDATA_COUNT];
 	}
+
+	DeletionQueue m_mainDeletionQueue;
 
 	struct SDL_Window* m_window = nullptr;
 
