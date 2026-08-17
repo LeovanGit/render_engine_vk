@@ -43,6 +43,10 @@ void RenderEngine::Init()
     m_instance->InitCommands();
 
     m_instance->InitSyncStructures();
+
+    m_instance->InitDescriptors();
+
+    m_instance->InitPipelines();
 }
 
 void RenderEngine::InitVulkan()
@@ -224,6 +228,92 @@ void RenderEngine::InitSyncStructures()
     }
 }
 
+void RenderEngine::InitDescriptors()
+{
+    std::vector<DescriptorAllocator::PoolSizeRatio> sizes =
+    {
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 }
+    };
+
+    m_globalDescriptorAllocator.InitPool(m_device, 10, sizes);
+
+    {
+        DescriptorLayoutBuilder builder;
+        builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+        m_drawImageDescriptorLayout = builder.Build(m_device, VK_SHADER_STAGE_COMPUTE_BIT);
+    }
+
+    m_drawImageDescriptors = m_globalDescriptorAllocator.Allocate(m_device, m_drawImageDescriptorLayout);
+
+    VkDescriptorImageInfo imgInfo{};
+    imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imgInfo.imageView = m_renderTarget.m_imageView;
+
+    VkWriteDescriptorSet drawImageWrite = {};
+    drawImageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    drawImageWrite.pNext = nullptr;
+    drawImageWrite.dstBinding = 0;
+    drawImageWrite.dstSet = m_drawImageDescriptors;
+    drawImageWrite.descriptorCount = 1;
+    drawImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    drawImageWrite.pImageInfo = &imgInfo;
+
+    vkUpdateDescriptorSets(m_device, 1, &drawImageWrite, 0, nullptr);
+
+    m_mainDeletionQueue.PushFunction([&]()
+        {
+            m_globalDescriptorAllocator.DestroyPool(m_device);
+            vkDestroyDescriptorSetLayout(m_device, m_drawImageDescriptorLayout, nullptr);
+        });
+}
+
+void RenderEngine::InitPipelines()
+{
+    InitBackgroundPipelines();
+}
+
+void RenderEngine::InitBackgroundPipelines()
+{
+    VkPipelineLayoutCreateInfo computeLayout = {};
+    computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    computeLayout.pNext = nullptr;
+    computeLayout.pSetLayouts = &m_drawImageDescriptorLayout;
+    computeLayout.setLayoutCount = 1;
+
+    VK_CHECK(vkCreatePipelineLayout(m_device, &computeLayout, nullptr, &m_gradientPipelineLayout));
+
+    VkShaderModule computeDrawShader;
+    if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/gradient.spv", m_device, &computeDrawShader))
+    {
+        fmt::print("Error when building the compute shader \n");
+        assert(false && "Error when building the compute shader \n");
+    }
+
+    VkPipelineShaderStageCreateInfo stageInfo{};
+    stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stageInfo.pNext = nullptr;
+    stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stageInfo.module = computeDrawShader;
+    stageInfo.pName = "main";
+
+    VkComputePipelineCreateInfo computePipelineCreateInfo = {};
+    computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    computePipelineCreateInfo.pNext = nullptr;
+    computePipelineCreateInfo.layout = m_gradientPipelineLayout;
+    computePipelineCreateInfo.stage = stageInfo;
+
+    VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &m_gradientPipeline));
+
+    vkDestroyShaderModule(m_device, computeDrawShader, nullptr);
+    
+    m_mainDeletionQueue.PushFunction(
+        [&]()
+        {
+            vkDestroyPipelineLayout(m_device, m_gradientPipelineLayout, nullptr);
+            vkDestroyPipeline(m_device, m_gradientPipeline, nullptr);
+        });
+}
+
 void RenderEngine::Destroy()
 {
     assert(m_instance != nullptr && "Engine is not initialized");
@@ -259,13 +349,30 @@ void RenderEngine::Run()
 
 void RenderEngine::DrawBackground(VkCommandBuffer cmd)
 {
-    VkClearColorValue clearValue;
-    float flash = std::abs(std::sin(m_currentFrameNumber / 120.f));
-    clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
+    //VkClearColorValue clearValue;
+    //float flash = std::abs(std::sin(m_currentFrameNumber / 120.f));
+    //clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
+    //
+    //VkImageSubresourceRange clearRange = vk_helpers::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+    //
+    //vkCmdClearColorImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 
-    VkImageSubresourceRange clearRange = vk_helpers::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+    // Биндим наш VkPipeline:
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipeline);
 
-    vkCmdClearColorImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+    // Биндим VkPipelineLayout и VkDesctiptorSet:
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
+
+    // Дроуколл:
+    // Поскольку мы в шейдере указали размер рабочей группы 16х16 пикселей, то
+    // нам нужно вызвать (width / 16, height / 16) рабочих групп,
+    // только с округлением вверх (на случай если размер текстуры не
+    // делится нацело на размер рабочей группы):
+    vkCmdDispatch(
+        cmd,
+        std::ceil(m_renderTarget.m_imageExtent.width / 16.0f),
+        std::ceil(m_renderTarget.m_imageExtent.height / 16.0f),
+        1);
 }
 
 void RenderEngine::Draw()

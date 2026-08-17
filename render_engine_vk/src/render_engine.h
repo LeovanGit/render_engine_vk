@@ -2,6 +2,8 @@
 
 #include "types.h"
 #include "image.h"
+#include "vk_descriptors.h"
+#include "vk_descriptor_allocator.h"
 
 namespace
 {
@@ -94,6 +96,14 @@ public:
 	VmaAllocator m_allocator;
 
 	AllocatedImage m_renderTarget;
+
+	DescriptorAllocator m_globalDescriptorAllocator;
+
+	VkDescriptorSet m_drawImageDescriptors;
+	VkDescriptorSetLayout m_drawImageDescriptorLayout;
+
+	VkPipeline m_gradientPipeline;
+	VkPipelineLayout m_gradientPipelineLayout;
 	
 private:
 	RenderEngine() = default;
@@ -114,6 +124,12 @@ private:
 	void InitCommands();
 
 	void InitSyncStructures();
+
+	void InitDescriptors();
+
+	void InitPipelines();
+
+	void InitBackgroundPipelines();
 
 	static RenderEngine* m_instance;
 };

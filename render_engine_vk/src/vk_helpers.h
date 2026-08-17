@@ -31,4 +31,9 @@ namespace vk_helpers
 		VkCommandBufferSubmitInfo* cmd,
 		VkSemaphoreSubmitInfo* signalSemaphoreInfo,
 		VkSemaphoreSubmitInfo* waitSemaphoreInfo);
+
+	bool LoadShaderModule(
+		const char* filePath,
+		VkDevice device,
+		VkShaderModule* outShaderModule);
 } // namesapce vk_init_helpers

@@ -23,6 +23,8 @@
     <ClCompile Include="src\image.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\render_engine.cpp" />
+    <ClCompile Include="src\vk_descriptors.cpp" />
+    <ClCompile Include="src\vk_descriptor_allocator.cpp" />
     <ClCompile Include="src\vk_helpers.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -32,10 +34,19 @@
     <ClInclude Include="src\image.h" />
     <ClInclude Include="src\render_engine.h" />
     <ClInclude Include="src\types.h" />
+    <ClInclude Include="src\vk_descriptors.h" />
+    <ClInclude Include="src\vk_descriptor_allocator.h" />
     <ClInclude Include="src\vk_helpers.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.inl" />
+    <CustomBuild Include="shaders\gradient.comp">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator -V "%(FullPath)" -o "$(OutDir)shaders\%(Filename).spv"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building shader: glslangValidator -V "%(FullPath)" -o "$(OutDir)shaders\%(Filename).spv"</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)shaders\%(Filename).spv</Outputs>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -123,7 +134,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)external_libs\SDL2-2.30.0\include;$(VULKAN_SDK)\Include;$(ProjectDir)external_libs\fmt-12.2.0\include;$(ProjectDir)external_libs\vk-bootstrap;$(ProjectDir)external_libs\vma;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

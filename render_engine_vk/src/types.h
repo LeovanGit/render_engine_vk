@@ -2,9 +2,9 @@
 
 //#include <memory>
 //#include <optional>
-//#include <string>
+#include <string>
 #include <vector>
-//#include <span>
+#include <span>
 //#include <array>
 #include <functional>
 #include <deque>
