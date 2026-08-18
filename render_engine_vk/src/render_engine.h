@@ -62,6 +62,8 @@ public:
 	void DrawBackground(VkCommandBuffer cmd);
 	void Draw();
 
+	void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function);
+
 	FrameData& GetCurrentFrame()
 	{
 		return m_frames[m_currentFrameNumber % FRAMEDATA_COUNT];
@@ -104,6 +106,11 @@ public:
 
 	VkPipeline m_gradientPipeline;
 	VkPipelineLayout m_gradientPipelineLayout;
+
+	// immediate submit structures:
+	VkFence m_immFence;
+	VkCommandBuffer m_immCommandBuffer;
+	VkCommandPool m_immCommandPool;
 	
 private:
 	RenderEngine() = default;

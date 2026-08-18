@@ -201,6 +201,16 @@ void RenderEngine::InitCommands()
         VK_CHECK(vkAllocateCommandBuffers(m_device, &cmdAllocInfo, &m_frames[i].m_commandBuffer));
     }
 
+    VK_CHECK(vkCreateCommandPool(m_device, &m_commandPoolInfo, nullptr, &m_immCommandPool));
+
+    VkCommandBufferAllocateInfo cmdAllocInfo = vk_helpers::CommandBufferAllocateInfo(m_immCommandPool, 1);
+    VK_CHECK(vkAllocateCommandBuffers(m_device, &cmdAllocInfo, &m_immCommandBuffer));
+
+    m_mainDeletionQueue.PushFunction(
+        [=]()
+        {
+            vkDestroyCommandPool(m_device, m_immCommandPool, nullptr);
+        });
 }
 
 void RenderEngine::InitSyncStructures()
@@ -226,6 +236,14 @@ void RenderEngine::InitSyncStructures()
         VK_CHECK(vkCreateSemaphore(m_device, &semaphoreCreateInfo, nullptr, &m_frames[i].m_renderSemaphore));
         m_mainDeletionQueue.PushFunction([&, renderSemaphore=m_frames[i].m_renderSemaphore]() { vkDestroySemaphore(m_device, renderSemaphore, nullptr); });
     }
+
+    VK_CHECK(vkCreateFence(m_device, &fenceCreateInfo, nullptr, &m_immFence));
+
+    m_mainDeletionQueue.PushFunction(
+        [=]()
+        {
+            vkDestroyFence(m_device, m_immFence, nullptr);
+        });
 }
 
 void RenderEngine::InitDescriptors()
@@ -357,17 +375,10 @@ void RenderEngine::DrawBackground(VkCommandBuffer cmd)
     //
     //vkCmdClearColorImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 
-    // Биндим наш VkPipeline:
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipeline);
 
-    // Биндим VkPipelineLayout и VkDesctiptorSet:
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
 
-    // Дроуколл:
-    // Поскольку мы в шейдере указали размер рабочей группы 16х16 пикселей, то
-    // нам нужно вызвать (width / 16, height / 16) рабочих групп,
-    // только с округлением вверх (на случай если размер текстуры не
-    // делится нацело на размер рабочей группы):
     vkCmdDispatch(
         cmd,
         std::ceil(m_renderTarget.m_imageExtent.width / 16.0f),
@@ -433,4 +444,29 @@ void RenderEngine::Draw()
     VK_CHECK(vkQueuePresentKHR(m_graphicsQueue, &presentInfo));
 
     ++m_currentFrameNumber;
+}
+
+void RenderEngine::ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& function)
+{
+    VK_CHECK(vkResetFences(m_device, 1, &m_immFence));
+    VK_CHECK(vkResetCommandBuffer(m_immCommandBuffer, 0));
+
+    VkCommandBuffer cmd = m_immCommandBuffer;
+
+    VkCommandBufferBeginInfo cmdBeginInfo = {};
+    cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBeginInfo.pNext = nullptr;
+    cmdBeginInfo.pInheritanceInfo = nullptr;
+    cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
+
+    function(cmd);
+
+    VK_CHECK(vkEndCommandBuffer(cmd));
+
+    VkCommandBufferSubmitInfo cmdinfo = vk_helpers::CommandBufferSubmitInfo(cmd);
+    VkSubmitInfo2 submit = vk_helpers::SubmitInfo(&cmdinfo, nullptr, nullptr);
+    VK_CHECK(vkQueueSubmit2(m_graphicsQueue, 1, &submit, m_immFence));
+
+    VK_CHECK(vkWaitForFences(m_device, 1, &m_immFence, true, 9999999999));
 }
