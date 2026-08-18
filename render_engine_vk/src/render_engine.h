@@ -122,6 +122,8 @@ public:
 	VkFence m_immFence;
 	VkCommandBuffer m_immCommandBuffer;
 	VkCommandPool m_immCommandPool;
+
+	ComputePushConstants pc;
 	
 private:
 	RenderEngine() = default;

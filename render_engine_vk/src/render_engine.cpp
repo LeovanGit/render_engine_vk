@@ -294,6 +294,9 @@ void RenderEngine::InitPipelines()
 
 void RenderEngine::InitBackgroundPipelines()
 {
+    pc.data1 = glm::vec4(1, 0, 0, 1);
+    pc.data2 = glm::vec4(0, 0, 1, 1);
+
     VkPipelineLayoutCreateInfo computeLayout = {};
     computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     computeLayout.pNext = nullptr;
@@ -439,7 +442,12 @@ void RenderEngine::Run()
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::ShowDemoWindow();
+        if (ImGui::Begin("background"))
+        {
+            ImGui::InputFloat4("data1", (float*)&pc.data1);
+            ImGui::InputFloat4("data2", (float*)&pc.data2);
+        }
+        ImGui::End();
 
         ImGui::Render();
 
@@ -476,10 +484,6 @@ void RenderEngine::DrawBackground(VkCommandBuffer cmd)
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipeline);
 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
-
-    ComputePushConstants pc;
-    pc.data1 = glm::vec4(1, 0, 0, 1);
-    pc.data2 = glm::vec4(0, 0, 1, 1);
 
     vkCmdPushConstants(cmd, m_gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &pc);
 
