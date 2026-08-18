@@ -94,5 +94,6 @@
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="shaders\gradient.comp" />
+    <CustomBuild Include="shaders\gradient_color.comp" />
   </ItemGroup>
 </Project>

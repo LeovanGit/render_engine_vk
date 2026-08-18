@@ -51,6 +51,12 @@ struct FrameData
 	DeletionQueue m_deletionQueue;
 };
 
+struct ComputePushConstants
+{
+	glm::vec4 data1;
+	glm::vec4 data2;
+};
+
 // Singletone
 class RenderEngine
 {

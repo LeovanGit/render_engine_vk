@@ -300,12 +300,27 @@ void RenderEngine::InitBackgroundPipelines()
     computeLayout.pSetLayouts = &m_drawImageDescriptorLayout;
     computeLayout.setLayoutCount = 1;
 
+    VkPushConstantRange pushConstant = {};
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(ComputePushConstants);
+    pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    computeLayout.pPushConstantRanges = &pushConstant;
+    computeLayout.pushConstantRangeCount = 1;
+
     VK_CHECK(vkCreatePipelineLayout(m_device, &computeLayout, nullptr, &m_gradientPipelineLayout));
 
+    //VkShaderModule computeDrawShader;
+    //if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/gradient.spv", m_device, &computeDrawShader))
+    //{
+    //    fmt::print("Error when building the compute shader \n");
+    //    assert(false && "Error when building the compute shader \n");
+    //}
+
     VkShaderModule computeDrawShader;
-    if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/gradient.spv", m_device, &computeDrawShader))
+    if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/gradient_color.spv", m_device, &computeDrawShader))
     {
-        fmt::print("Error when building the compute shader \n");
+        fmt::print("Error when building the colored mesh shader \n");
         assert(false && "Error when building the compute shader \n");
     }
 
@@ -461,6 +476,12 @@ void RenderEngine::DrawBackground(VkCommandBuffer cmd)
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipeline);
 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
+
+    ComputePushConstants pc;
+    pc.data1 = glm::vec4(1, 0, 0, 1);
+    pc.data2 = glm::vec4(0, 0, 1, 1);
+
+    vkCmdPushConstants(cmd, m_gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &pc);
 
     vkCmdDispatch(
         cmd,
