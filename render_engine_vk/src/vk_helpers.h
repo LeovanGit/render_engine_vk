@@ -36,4 +36,14 @@ namespace vk_helpers
 		const char* filePath,
 		VkDevice device,
 		VkShaderModule* outShaderModule);
+
+	VkRenderingAttachmentInfo AttachmentInfo(
+		VkImageView view,
+		VkClearValue* clear,
+		VkImageLayout layout /*= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL*/);
+
+	VkRenderingInfo RenderingInfo(
+		VkExtent2D colorAttachmentExtent,
+		VkRenderingAttachmentInfo* colorAttachmentInfo,
+		VkRenderingAttachmentInfo* depthAttachmentInfo);
 } // namesapce vk_init_helpers

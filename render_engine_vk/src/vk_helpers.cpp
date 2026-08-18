@@ -153,3 +153,46 @@ bool vk_helpers::LoadShaderModule(
 	*outShaderModule = shaderModule;
 	return true;
 }
+
+VkRenderingAttachmentInfo vk_helpers::AttachmentInfo(
+	VkImageView view,
+	VkClearValue* clear,
+	VkImageLayout layout)
+{
+	VkRenderingAttachmentInfo colorAttachment = {};
+	colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+	colorAttachment.pNext = nullptr;
+	colorAttachment.imageView = view;
+	colorAttachment.imageLayout = layout;
+	colorAttachment.loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+	if (clear)
+	{
+		colorAttachment.clearValue = *clear;
+	}
+
+	return colorAttachment;
+}
+
+VkRenderingInfo vk_helpers::RenderingInfo(
+	VkExtent2D colorAttachmentExtent,
+	VkRenderingAttachmentInfo* colorAttachmentInfo,
+	VkRenderingAttachmentInfo* depthAttachmentInfo)
+{
+	VkRect2D renderArea = {};
+	renderArea.offset = { 0, 0 };
+	renderArea.extent = colorAttachmentExtent;
+
+	VkRenderingInfo renderingInfo = {};
+	renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+	renderingInfo.pNext = nullptr;
+	renderingInfo.renderArea = renderArea;
+	renderingInfo.layerCount = 1;
+	renderingInfo.colorAttachmentCount = colorAttachmentInfo ? 1 : 0;
+	renderingInfo.pColorAttachments = colorAttachmentInfo;
+	renderingInfo.pDepthAttachment = depthAttachmentInfo;
+	renderingInfo.pStencilAttachment = nullptr;
+
+	return renderingInfo;
+}

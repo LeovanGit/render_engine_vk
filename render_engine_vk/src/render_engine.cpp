@@ -47,6 +47,8 @@ void RenderEngine::Init()
     m_instance->InitDescriptors();
 
     m_instance->InitPipelines();
+
+    m_instance->InitImGUI();
 }
 
 void RenderEngine::InitVulkan()
@@ -332,6 +334,61 @@ void RenderEngine::InitBackgroundPipelines()
         });
 }
 
+void RenderEngine::InitImGUI()
+{
+    VkDescriptorPoolSize poolSizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+    };
+
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    poolInfo.maxSets = 1000;
+    poolInfo.poolSizeCount = (uint32_t)std::size(poolSizes);
+    poolInfo.pPoolSizes = poolSizes;
+
+    VkDescriptorPool imguiPool;
+    VK_CHECK(vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &imguiPool));
+
+    ImGui::CreateContext();
+
+    ImGui_ImplSDL2_InitForVulkan(m_window);
+
+    ImGui_ImplVulkan_InitInfo initInfo = {};
+    initInfo.Instance = m_vkInstance;
+    initInfo.PhysicalDevice = m_chosenGPU;
+    initInfo.Device = m_device;
+    initInfo.Queue = m_graphicsQueue;
+    initInfo.DescriptorPool = imguiPool;
+    initInfo.MinImageCount = 3;
+    initInfo.ImageCount = 3;
+    initInfo.UseDynamicRendering = true;
+    initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+    initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    initInfo.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &m_swapchainImageFormat;
+    initInfo.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+    ImGui_ImplVulkan_Init(&initInfo);
+
+    m_mainDeletionQueue.PushFunction(
+        [=]()
+        {
+            ImGui_ImplVulkan_Shutdown();
+            vkDestroyDescriptorPool(m_device, imguiPool, nullptr);
+        });
+}
+
 void RenderEngine::Destroy()
 {
     assert(m_instance != nullptr && "Engine is not initialized");
@@ -359,10 +416,36 @@ void RenderEngine::Run()
                 run = false;
                 break;
             }
+
+            ImGui_ImplSDL2_ProcessEvent(&event);
         }
+
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::ShowDemoWindow();
+
+        ImGui::Render();
 
         Draw();
     }
+}
+
+void RenderEngine::DrawImGUI(VkCommandBuffer cmd, VkImageView targetImageView)
+{
+    VkExtent2D renderTargetExtent = {};
+    renderTargetExtent.width = m_renderTarget.m_imageExtent.width;
+    renderTargetExtent.height = m_renderTarget.m_imageExtent.height;
+
+    VkRenderingAttachmentInfo colorAttachment = vk_helpers::AttachmentInfo(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    VkRenderingInfo renderInfo = vk_helpers::RenderingInfo(renderTargetExtent, &colorAttachment, nullptr);
+
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+
+    vkCmdEndRendering(cmd);
 }
 
 void RenderEngine::DrawBackground(VkCommandBuffer cmd)
@@ -420,7 +503,10 @@ void RenderEngine::Draw()
     renderTargetSize.height = m_renderTarget.m_imageExtent.height;
     vk_helpers::CopyImageToImage(cmd, m_renderTarget.m_image, m_swapchainImages[swapchainImageIndex], renderTargetSize, m_swapchainSize);
 
-    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    // Draw ImGUI:
+    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    DrawImGUI(cmd, m_swapchainImageViews[swapchainImageIndex]);
+    vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VK_CHECK(vkEndCommandBuffer(cmd));
 

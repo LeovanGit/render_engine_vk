@@ -5,6 +5,10 @@
 #include "vk_descriptors.h"
 #include "vk_descriptor_allocator.h"
 
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_vulkan.h"
+
 namespace
 {
 	constexpr VkExtent2D windowSize = { 480 , 270 };
@@ -59,6 +63,7 @@ public:
 
 	void Run(); // main loop
 
+	void DrawImGUI(VkCommandBuffer cmd, VkImageView targetImageView);
 	void DrawBackground(VkCommandBuffer cmd);
 	void Draw();
 
@@ -137,6 +142,8 @@ private:
 	void InitPipelines();
 
 	void InitBackgroundPipelines();
+
+	void InitImGUI();
 
 	static RenderEngine* m_instance;
 };
