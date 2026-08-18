@@ -294,9 +294,6 @@ void RenderEngine::InitPipelines()
 
 void RenderEngine::InitBackgroundPipelines()
 {
-    pc.data1 = glm::vec4(1, 0, 0, 1);
-    pc.data2 = glm::vec4(0, 0, 1, 1);
-
     VkPipelineLayoutCreateInfo computeLayout = {};
     computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     computeLayout.pNext = nullptr;
@@ -313,25 +310,36 @@ void RenderEngine::InitBackgroundPipelines()
 
     VK_CHECK(vkCreatePipelineLayout(m_device, &computeLayout, nullptr, &m_gradientPipelineLayout));
 
-    //VkShaderModule computeDrawShader;
-    //if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/gradient.spv", m_device, &computeDrawShader))
-    //{
-    //    fmt::print("Error when building the compute shader \n");
-    //    assert(false && "Error when building the compute shader \n");
-    //}
+    ComputeEffect gradient0;
+    gradient0.m_layout = m_gradientPipelineLayout;
+    gradient0.m_name = "gradient0";
+    gradient0.m_data = {};
 
-    VkShaderModule computeDrawShader;
-    if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/gradient_color.spv", m_device, &computeDrawShader))
+    ComputeEffect gradient1;
+    gradient1.m_layout = m_gradientPipelineLayout;
+    gradient1.m_name = "gradient1";
+    gradient1.m_data.data1 = glm::vec4(0.1f, 0.2f, 0.4f, 1.0f);
+    gradient1.m_data.data2 = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+    VkShaderModule computeDrawShader0;
+    if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/gradient.spv", m_device, &computeDrawShader0))
     {
-        fmt::print("Error when building the colored mesh shader \n");
-        assert(false && "Error when building the compute shader \n");
+        fmt::print("Error when building the compute0 shader \n");
+        assert(false && "Error when building the compute0 shader \n");
     }
 
-    VkPipelineShaderStageCreateInfo stageInfo{};
+    VkShaderModule computeDrawShader1;
+    if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/gradient_color.spv", m_device, &computeDrawShader1))
+    {
+        fmt::print("Error when building the compute1 shader \n");
+        assert(false && "Error when building the compute1 shader \n");
+    }
+
+    VkPipelineShaderStageCreateInfo stageInfo = {};
     stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stageInfo.pNext = nullptr;
     stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stageInfo.module = computeDrawShader;
+    stageInfo.module = computeDrawShader0;
     stageInfo.pName = "main";
 
     VkComputePipelineCreateInfo computePipelineCreateInfo = {};
@@ -340,15 +348,24 @@ void RenderEngine::InitBackgroundPipelines()
     computePipelineCreateInfo.layout = m_gradientPipelineLayout;
     computePipelineCreateInfo.stage = stageInfo;
 
-    VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &m_gradientPipeline));
+    VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &gradient0.m_pipeline));
 
-    vkDestroyShaderModule(m_device, computeDrawShader, nullptr);
+    computePipelineCreateInfo.stage.module = computeDrawShader1;
+
+    VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &gradient1.m_pipeline));
+
+    m_backgroundEffects.push_back(gradient0);
+    m_backgroundEffects.push_back(gradient1);
+
+    vkDestroyShaderModule(m_device, computeDrawShader1, nullptr);
+    vkDestroyShaderModule(m_device, computeDrawShader0, nullptr);
     
     m_mainDeletionQueue.PushFunction(
         [&]()
         {
+            vkDestroyPipeline(m_device, gradient1.m_pipeline, nullptr);
+            vkDestroyPipeline(m_device, gradient0.m_pipeline, nullptr);
             vkDestroyPipelineLayout(m_device, m_gradientPipelineLayout, nullptr);
-            vkDestroyPipeline(m_device, m_gradientPipeline, nullptr);
         });
 }
 
@@ -444,8 +461,14 @@ void RenderEngine::Run()
 
         if (ImGui::Begin("background"))
         {
-            ImGui::InputFloat4("data1", (float*)&pc.data1);
-            ImGui::InputFloat4("data2", (float*)&pc.data2);
+            ComputeEffect& selected = m_backgroundEffects[m_currentBackgroundEffect];
+
+            ImGui::Text("Selected effect: %s", selected.m_name);
+
+            ImGui::SliderInt("Effect Index", &m_currentBackgroundEffect, 0, m_backgroundEffects.size() - 1);
+
+            ImGui::InputFloat4("data1", (float*)&selected.m_data.data1);
+            ImGui::InputFloat4("data2", (float*)&selected.m_data.data2);
         }
         ImGui::End();
 
@@ -473,19 +496,13 @@ void RenderEngine::DrawImGUI(VkCommandBuffer cmd, VkImageView targetImageView)
 
 void RenderEngine::DrawBackground(VkCommandBuffer cmd)
 {
-    //VkClearColorValue clearValue;
-    //float flash = std::abs(std::sin(m_currentFrameNumber / 120.f));
-    //clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
-    //
-    //VkImageSubresourceRange clearRange = vk_helpers::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-    //
-    //vkCmdClearColorImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+    ComputeEffect& effect = m_backgroundEffects[m_currentBackgroundEffect];
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipeline);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.m_pipeline);
 
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_gradientPipelineLayout, 0, 1, &m_drawImageDescriptors, 0, nullptr);
 
-    vkCmdPushConstants(cmd, m_gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &pc);
+    vkCmdPushConstants(cmd, m_gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.m_data);
 
     vkCmdDispatch(
         cmd,

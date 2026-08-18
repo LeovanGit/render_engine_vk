@@ -57,6 +57,16 @@ struct ComputePushConstants
 	glm::vec4 data2;
 };
 
+struct ComputeEffect
+{
+	const char* m_name;
+
+	VkPipeline m_pipeline;
+	VkPipelineLayout m_layout;
+
+	ComputePushConstants m_data;
+};
+
 // Singletone
 class RenderEngine
 {
@@ -115,7 +125,6 @@ public:
 	VkDescriptorSet m_drawImageDescriptors;
 	VkDescriptorSetLayout m_drawImageDescriptorLayout;
 
-	VkPipeline m_gradientPipeline;
 	VkPipelineLayout m_gradientPipelineLayout;
 
 	// immediate submit structures:
@@ -123,7 +132,8 @@ public:
 	VkCommandBuffer m_immCommandBuffer;
 	VkCommandPool m_immCommandPool;
 
-	ComputePushConstants pc;
+	std::vector<ComputeEffect> m_backgroundEffects;
+	int m_currentBackgroundEffect = 0;
 	
 private:
 	RenderEngine() = default;
