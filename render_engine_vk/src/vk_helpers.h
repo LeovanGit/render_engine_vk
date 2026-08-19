@@ -46,4 +46,8 @@ namespace vk_helpers
 		VkExtent2D colorAttachmentExtent,
 		VkRenderingAttachmentInfo* colorAttachmentInfo,
 		VkRenderingAttachmentInfo* depthAttachmentInfo);
+
+	VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(
+		VkShaderStageFlagBits stage,
+		VkShaderModule shader);
 } // namesapce vk_init_helpers

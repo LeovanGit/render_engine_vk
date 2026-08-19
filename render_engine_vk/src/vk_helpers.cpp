@@ -99,21 +99,21 @@ VkSubmitInfo2 vk_helpers::SubmitInfo(
 	VkCommandBufferSubmitInfo* cmd,
 	VkSemaphoreSubmitInfo* signalSemaphoreInfo,
 	VkSemaphoreSubmitInfo* waitSemaphoreInfo)
-{
-	VkSubmitInfo2 info = {};
-	info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-	info.pNext = nullptr;
+	{
+		VkSubmitInfo2 info = {};
+		info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+		info.pNext = nullptr;
 
-	info.waitSemaphoreInfoCount = waitSemaphoreInfo == nullptr ? 0 : 1;
-	info.pWaitSemaphoreInfos = waitSemaphoreInfo;
+		info.waitSemaphoreInfoCount = waitSemaphoreInfo == nullptr ? 0 : 1;
+		info.pWaitSemaphoreInfos = waitSemaphoreInfo;
 
-	info.signalSemaphoreInfoCount = signalSemaphoreInfo == nullptr ? 0 : 1;
-	info.pSignalSemaphoreInfos = signalSemaphoreInfo;
+		info.signalSemaphoreInfoCount = signalSemaphoreInfo == nullptr ? 0 : 1;
+		info.pSignalSemaphoreInfos = signalSemaphoreInfo;
 
-	info.commandBufferInfoCount = 1;
-	info.pCommandBufferInfos = cmd;
+		info.commandBufferInfoCount = 1;
+		info.pCommandBufferInfos = cmd;
 
-	return info;
+		return info;
 }
 
 bool vk_helpers::LoadShaderModule(
@@ -195,4 +195,18 @@ VkRenderingInfo vk_helpers::RenderingInfo(
 	renderingInfo.pStencilAttachment = nullptr;
 
 	return renderingInfo;
+}
+
+VkPipelineShaderStageCreateInfo vk_helpers::PipelineShaderStageCreateInfo(
+	VkShaderStageFlagBits stage,
+	VkShaderModule shader)
+{
+	VkPipelineShaderStageCreateInfo shaderStageInfo = {};
+	shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStageInfo.pNext = nullptr;
+	shaderStageInfo.stage = stage;
+	shaderStageInfo.module = shader;
+	shaderStageInfo.pName = "main";
+
+	return shaderStageInfo;
 }

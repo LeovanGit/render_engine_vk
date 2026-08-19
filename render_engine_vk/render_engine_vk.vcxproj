@@ -33,6 +33,7 @@
     <ClCompile Include="src\vk_descriptors.cpp" />
     <ClCompile Include="src\vk_descriptor_allocator.cpp" />
     <ClCompile Include="src\vk_helpers.cpp" />
+    <ClCompile Include="src\vk_pipelines.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="external_libs\vk-bootstrap\VkBootstrap.h" />
@@ -44,6 +45,7 @@
     <ClInclude Include="src\vk_descriptors.h" />
     <ClInclude Include="src\vk_descriptor_allocator.h" />
     <ClInclude Include="src\vk_helpers.h" />
+    <ClInclude Include="src\vk_pipelines.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.inl" />
@@ -58,6 +60,20 @@
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator -V "%(FullPath)" -o "$(OutDir)shaders\%(Filename).spv"</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building shader: glslangValidator -V "%(FullPath)" -o "$(OutDir)shaders\%(Filename).spv</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)shaders\%(Filename).spv</Outputs>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\color_triangle.frag">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator -V "%(FullPath)" -o "$(OutDir)shaders\%(Filename).frag.spv"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building shader: glslangValidator -V "%(FullPath)" -o "$(OutDir)shaders\%(Filename).spv"</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)shaders\%(Filename).spv</Outputs>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
+    </CustomBuild>
+    <CustomBuild Include="shaders\color_triangle.vert">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator -V "%(FullPath)" -o "$(OutDir)shaders\%(Filename).vert.spv"</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building shader: glslangValidator -V "%(FullPath)" -o "$(OutDir)shaders\%(Filename).spv"</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)shaders\%(Filename).spv</Outputs>
       <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildInParallel>
     </CustomBuild>

@@ -57,6 +57,9 @@
     <ClCompile Include="external_libs\imgui-1.92.9b\backends\imgui_impl_vulkan.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\vk_pipelines.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\render_engine.h">
@@ -86,6 +89,9 @@
     <ClInclude Include="src\vk_descriptor_allocator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\vk_pipelines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="external_libs\vk-bootstrap\VkBootstrapFeatureChain.inl">
@@ -95,5 +101,7 @@
   <ItemGroup>
     <CustomBuild Include="shaders\gradient.comp" />
     <CustomBuild Include="shaders\gradient_color.comp" />
+    <CustomBuild Include="shaders\color_triangle.vert" />
+    <CustomBuild Include="shaders\color_triangle.frag" />
   </ItemGroup>
 </Project>

@@ -10,6 +10,7 @@
 #include <vk_mem_alloc.h>
 
 #include "vk_helpers.h"
+#include "vk_pipelines.h"
 
 RenderEngine* RenderEngine::m_instance = nullptr;
 
@@ -290,6 +291,7 @@ void RenderEngine::InitDescriptors()
 void RenderEngine::InitPipelines()
 {
     InitBackgroundPipelines();
+    InitTrianglePipeline();
 }
 
 void RenderEngine::InitBackgroundPipelines()
@@ -366,6 +368,53 @@ void RenderEngine::InitBackgroundPipelines()
             vkDestroyPipeline(m_device, gradient1.m_pipeline, nullptr);
             vkDestroyPipeline(m_device, gradient0.m_pipeline, nullptr);
             vkDestroyPipelineLayout(m_device, m_gradientPipelineLayout, nullptr);
+        });
+}
+
+void RenderEngine::InitTrianglePipeline()
+{
+    VkShaderModule triangleFragShader;
+    if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/color_triangle.frag.spv", m_device, &triangleFragShader))
+    {
+        fmt::print("Error when building the triangle fragment shader module");
+        assert(false && "Error when building the triangle fragment shader module\n");
+    }
+
+    VkShaderModule triangleVertexShader;
+    if (!vk_helpers::LoadShaderModule("x64/Debug/shaders/color_triangle.vert.spv", m_device, &triangleVertexShader))
+    {
+        fmt::print("Error when building the triangle vertex shader module");
+        assert(false && "Error when building the triangle vertex shader module\n");
+    }
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    VK_CHECK(vkCreatePipelineLayout(m_device, &pipelineLayoutInfo, nullptr, &m_trianglePipelineLayout));
+
+    PipelineBuilder pipelineBuilder;
+    pipelineBuilder.m_pipelineLayout = m_trianglePipelineLayout;
+
+    pipelineBuilder.SetShaders(triangleVertexShader, triangleFragShader);
+
+    pipelineBuilder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    pipelineBuilder.SetPolygonMode(VK_POLYGON_MODE_FILL);
+    pipelineBuilder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+    pipelineBuilder.DisableMultisampling();
+    pipelineBuilder.DisableBlending();
+    pipelineBuilder.DisableDepthTest();
+
+    pipelineBuilder.SetColorAttachmentFormat(m_renderTarget.m_imageFormat);
+    pipelineBuilder.SetDepthFormat(VK_FORMAT_UNDEFINED);
+
+    m_trianglePipeline = pipelineBuilder.BuildPipeline(m_device);
+
+    vkDestroyShaderModule(m_device, triangleFragShader, nullptr);
+    vkDestroyShaderModule(m_device, triangleVertexShader, nullptr);
+
+    m_mainDeletionQueue.PushFunction(
+        [&]()
+        {
+            vkDestroyPipeline(m_device, m_trianglePipeline, nullptr);
+            vkDestroyPipelineLayout(m_device, m_trianglePipelineLayout, nullptr);
         });
 }
 
@@ -478,6 +527,43 @@ void RenderEngine::Run()
     }
 }
 
+void RenderEngine::DrawGeometry(VkCommandBuffer cmd)
+{
+    VkExtent2D renderTargetExtent = {};
+    renderTargetExtent.width = m_renderTarget.m_imageExtent.width;
+    renderTargetExtent.height = m_renderTarget.m_imageExtent.height;
+
+    VkRenderingAttachmentInfo colorAttachment = vk_helpers::AttachmentInfo(m_renderTarget.m_imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    VkRenderingInfo renderInfo = vk_helpers::RenderingInfo(renderTargetExtent, &colorAttachment, nullptr);
+
+    vkCmdBeginRendering(cmd, &renderInfo);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_trianglePipeline);
+
+    VkViewport viewport = {};
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = renderTargetExtent.width;
+    viewport.height = renderTargetExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    scissor.extent.width = renderTargetExtent.width;
+    scissor.extent.height = renderTargetExtent.height;
+
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+    vkCmdDraw(cmd, 3, 1, 0, 0);
+
+    vkCmdEndRendering(cmd);
+}
+
 void RenderEngine::DrawImGUI(VkCommandBuffer cmd, VkImageView targetImageView)
 {
     VkExtent2D renderTargetExtent = {};
@@ -537,7 +623,11 @@ void RenderEngine::Draw()
 
     DrawBackground(cmd);
 
-    vk_helpers::TransitionImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    vk_helpers::TransitionImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+    DrawGeometry(cmd);
+
+    vk_helpers::TransitionImage(cmd, m_renderTarget.m_image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     vk_helpers::TransitionImage(cmd, m_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkExtent2D renderTargetSize = {};
